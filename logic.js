@@ -81,6 +81,71 @@ export const DEFAULT_SETTINGS = {
 
 export const WEEKDAYS = ['E', 'T', 'K', 'N', 'R', 'L', 'P'];
 
+// ---------- spoken texts ----------
+// Every fixed sentence the app reads aloud. scripts/generate-audio.mjs turns these into bundled audio files.
+export const TTS_SPEAKER = 'mari';
+
+export const SAY = {
+  morningHello: 'Tere hommikust! Kuidas sa end praegu tunned?',
+  sleep: 'Kuidas sa öösel magasid?',
+  planHint: 'Ütle see valjult ja kujuta ette, kuidas sa seda koolis teed.',
+  goalToday: 'Mis on sinu tänane eesmärk?',
+  morningDone: 'Said tähe! Sa saad sellega hakkama.',
+  eveningHello: 'Milline tunne oli täna kõige suurem?',
+  goalWhich: 'Millist eesmärki sa täna proovisid?',
+  goalHow: 'Kuidas läks sinu eesmärk? Ausalt vastata on kõige tublim.',
+  hardPlace: 'Kus oli täna kõige raskem?',
+  goodPlace: 'Kus läks täna kõige paremini?',
+  recordHint: 'Vajuta punast nuppu ja räägi.',
+  eveningDoneHard: 'Said tähe! Sul oli täna raske tunne ja sa rääkisid sellest. See on julge! Nüüd mine ja kallista emmet või issit.',
+  eveningDoneOk: 'Said tähe! Sa oskad oma tundeid ära tunda. Väga hea! Nüüd mine ja kallista emmet või issit.',
+  calmMenu: 'Mis sind praegu aitaks?',
+  breatheIn: 'Hinga sisse ja puhu õhupall suureks.',
+  breatheOut: 'Hinga välja, aeglaselt.',
+  breatheDone: 'Tubli!',
+};
+
+export const TURTLE_STEPS = [
+  { emoji: '✋', text: 'Peatu! Ütle endale mõttes: STOPP.' },
+  { emoji: '🐢', text: 'Mine kilpkonnaks: tõmba pea õlgade vahele ja kallista ennast.', seconds: 5 },
+  { emoji: '🌬️', text: 'Hinga kolm korda aeglaselt sisse ja välja.', breathe: 3 },
+  { emoji: '💡', text: 'Nüüd mõtle: mis oleks hea lahendus? Võid ka täiskasvanult abi küsida.' },
+];
+
+export const SQUEEZE_STEPS = [
+  { emoji: '✊', text: 'Pigista rusikad kõvasti kokku!', seconds: 5 },
+  { emoji: '🖐️', text: 'Lase lahti. Tunne, kuidas käed on pehmed.', seconds: 5 },
+  { emoji: '🙆', text: 'Tõmba õlad kõrvadeni üles!', seconds: 5 },
+  { emoji: '😌', text: 'Lase õlad alla. Aaah.', seconds: 5 },
+  { emoji: '🦶', text: 'Suru varbad kõvasti vastu põrandat!', seconds: 5 },
+  { emoji: '🌟', text: 'Lase lahti. Sa oled nüüd rahulikum.' },
+];
+
+export const intensityQuestion = (emotion) => `Kui suur see ${emotion.label.toLowerCase()} tunne oli?`;
+export const planSentence = (p) => `Kui ${p.if}, siis ${p.then}.`;
+
+export function speakableTexts() {
+  return [...new Set([
+    ...Object.values(SAY),
+    ...ALL_QUESTIONS.map((q) => q.text),
+    ...EMOTIONS.map(intensityQuestion),
+    ...DEFAULT_SETTINGS.plans.map(planSentence),
+    ...TURTLE_STEPS.map((s) => s.text),
+    ...SQUEEZE_STEPS.map((s) => s.text),
+  ])];
+}
+
+// FNV-1a 32-bit over normalized text; names the audio file for a sentence.
+export function textHash(text) {
+  const s = String(text).trim().replace(/\s+/g, ' ');
+  let h = 0x811c9dc5;
+  for (const ch of s) {
+    h ^= ch.codePointAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
 export function dayKey(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

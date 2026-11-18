@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   dayKey, dayIndex, weekdayOf, questionsForDay, computeStats,
   starBalance, nextReward, escapeHtml, isHardDay, computeContextStats, computeSleepStats,
+  textHash, speakableTexts, planSentence, DEFAULT_SETTINGS,
 } from '../logic.js';
 
 test('dayKey formats local date', () => {
@@ -88,6 +89,21 @@ test('computeSleepStats joins morning sleep with same-day evening', () => {
   assert.deepEqual(s.bad, { days: 1, hard: 1 });
   assert.deepEqual(s.good, { days: 1, hard: 0 });
   assert.deepEqual(s.ok, { days: 0, hard: 0 });
+});
+
+test('textHash is stable, whitespace-insensitive, and distinct', () => {
+  assert.equal(textHash('Tere hommikust!'), textHash('  Tere   hommikust! '));
+  assert.notEqual(textHash('Tere'), textHash('tere'));
+  assert.match(textHash('õäöü'), /^[0-9a-f]{8}$/);
+});
+
+test('speakableTexts covers questions, plans and calm steps without duplicates or hash collisions', () => {
+  const t = speakableTexts();
+  assert.equal(new Set(t).size, t.length);
+  assert.ok(t.includes('Mis oli täna kõige toredam hetk?'));
+  assert.ok(t.includes('Kui suur see vihane tunne oli?'));
+  assert.ok(t.includes(planSentence(DEFAULT_SETTINGS.plans[0])));
+  assert.equal(new Set(t.map(textHash)).size, t.length);
 });
 
 test('escapeHtml', () => {

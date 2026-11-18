@@ -130,3 +130,5 @@ select { width: 100%; font: inherit; border: 1px solid #d8d6ee; border-radius: 1
 i.hard { background: #ff8a80; } i.good { background: #7ad3a0; }
 .legend { font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.say { position: fixed; right: max(16px, calc(50% - 264px)); top: max(16px, env(safe-area-inset-top)); width: 52px; height: 52px; border-radius: 50%; border: 0; background: #fff; font-size: 1.6rem; box-shadow: 0 3px 10px rgba(0,0,0,.12); cursor: pointer; z-index: 5; }
+.sound { border: 0; background: none; font-size: 1.6rem; margin-left: auto; margin-right: 8px; cursor: pointer; }

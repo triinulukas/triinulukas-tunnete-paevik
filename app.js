@@ -3,17 +3,20 @@ import {
   EMOTIONS, INTENSITY, GOAL_RESULTS, ALL_QUESTIONS, DEFAULT_SETTINGS, WEEKDAYS, SLEEP, CONTEXTS,
   dayKey, questionsForDay, emotionById, computeStats, computeContextStats, computeSleepStats,
   starBalance, nextReward, escapeHtml as esc,
+  SAY, TURTLE_STEPS, SQUEEZE_STEPS, intensityQuestion, planSentence, textHash, TTS_SPEAKER,
 } from './logic.js';
 
 const app = document.getElementById('app');
 const MAX_RECORD_MS = 90_000;
 
 // ---------- helpers ----------
-function render(html, bind) {
+// `say`: what the screen reads aloud (strings = spoken text, {audioId} = a parent's recording).
+function render(html, bind, say) {
   stopAudio();
-  app.innerHTML = html;
+  app.innerHTML = html + (say ? '<button class="say" data-say aria-label="Kuula uuesti">🔊</button>' : '');
   window.scrollTo(0, 0);
   bind?.(app);
+  if (say) { on('[data-say]', () => speak(say, { force: true })); speak(say); }
 }
 const $ = (sel, root = app) => root.querySelector(sel);
 const $$ = (sel, root = app) => [...root.querySelectorAll(sel)];
@@ -31,16 +34,65 @@ async function addStar(delta, reason) { await db.put('stars', { delta, reason, t
 function newId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
 
 // ---------- audio ----------
-let currentAudio = null;
-function stopAudio() { currentAudio?.pause(); currentAudio = null; }
-async function playAudio(audioId) {
+// One shared <audio> element, unlocked by the first tap: iOS blocks sound that doesn't start from a tap.
+const player = new Audio();
+const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+document.addEventListener('pointerdown', () => { player.src = SILENT; player.play().catch(() => {}); }, { once: true });
+let playToken = 0;
+let soundOn = true;
+let bundled = new Set();
+const ready = Promise.all([
+  fetch('./audio/index.json').then((r) => r.json()).then((l) => { bundled = new Set(l); }).catch(() => {}),
+  getSetting('sound', true).then((v) => { soundOn = v; }),
+]);
+
+function stopAudio() { playToken += 1; player.pause(); }
+
+function playUrl(url, token) {
+  return new Promise((resolve) => {
+    if (token !== playToken) return resolve();
+    player.onended = () => resolve();
+    player.onerror = () => resolve();
+    player.src = url;
+    player.play().catch(() => resolve());
+  });
+}
+
+async function urlFor(item) {
+  if (item.audioId) { const b = await db.get('audio', item.audioId); return b ? URL.createObjectURL(b) : null; }
+  const h = textHash(item);
+  const custom = await db.get('audio', `tts:${h}`);
+  if (custom) return URL.createObjectURL(custom);
+  return bundled.has(h) ? `./audio/${h}.m4a` : null;
+}
+
+// Plays items one after another; stops as soon as the screen changes.
+async function speak(items, { force = false } = {}) {
+  await ready;
+  if (!soundOn && !force) return;
   stopAudio();
-  const blob = audioId && (await db.get('audio', audioId));
-  if (!blob) return;
-  const url = URL.createObjectURL(blob);
-  currentAudio = new Audio(url);
-  currentAudio.onended = () => URL.revokeObjectURL(url);
-  currentAudio.play();
+  const token = playToken;
+  for (const item of items.filter(Boolean)) {
+    const url = await urlFor(item);
+    if (token !== playToken) return;
+    if (url) await playUrl(url, token);
+  }
+}
+const playAudio = (audioId) => speak([{ audioId }], { force: true });
+
+// Makes a voice for a parent-written sentence (needs internet once), stored on the device.
+async function ensureVoice(text) {
+  const h = textHash(text);
+  if (bundled.has(h) || (await db.get('audio', `tts:${h}`))) return true;
+  try {
+    const res = await fetch('https://api.tartunlp.ai/text-to-speech/v2', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, speaker: TTS_SPEAKER, speed: 0.95 }),
+    });
+    if (!res.ok) return false;
+    await db.put('audio', await res.blob(), `tts:${h}`);
+    return true;
+  } catch { return false; }
 }
 function pickMime() {
   if (!window.MediaRecorder) return null;
@@ -63,6 +115,7 @@ function recorder(container, { audioId = null, onSaved, big = true } = {}) {
     on('[data-r=play]', () => playAudio(id), container);
   };
   async function start() {
+    stopAudio();
     container.innerHTML = '<p class="hint pulse">Oota…</p>';
     const mime = pickMime();
     if (mime === null) return draw('error');
@@ -104,8 +157,9 @@ async function home() {
   ]);
   const { next, remaining, reachable } = nextReward(bal, s.rewards);
   const hour = new Date().getHours();
+  await ready;
   render(`
-    <header class="top"><h1>Minu päev</h1><div class="stars">⭐ ${bal}</div></header>
+    <header class="top"><h1>Minu päev</h1><button class="sound" data-sound>${soundOn ? '🔊' : '🔇'}</button><div class="stars">⭐ ${bal}</div></header>
     ${next ? `<p class="reward">Veel <b>${remaining}</b> ⭐ ja saad: <b>${esc(next.text)}</b></p>` : ''}
     ${reachable.length ? `<p class="reward ok">Sul on piisavalt tähti: <b>${esc(reachable.at(-1).text)}</b>. Näita emmele või issile!</p>` : ''}
     <div class="menu">
@@ -119,6 +173,10 @@ async function home() {
     on('[data-go=evening]', eveningFlow);
     on('[data-go=calm]', calmMenu);
     on('[data-go=parent]', parentGate);
+    on('[data-sound]', async (ev) => {
+      soundOn = !soundOn; await setSetting('sound', soundOn);
+      ev.currentTarget.textContent = soundOn ? '🔊' : '🔇';
+    });
   });
 }
 
@@ -134,7 +192,7 @@ function emotionPicker(title, onPick) {
     <div class="emotions">
       ${EMOTIONS.map((e) => `<button class="emo" style="--c:${e.color}" data-e="${e.id}"><b>${e.emoji}</b>${e.label}</button>`).join('')}
     </div>
-  `, () => on('[data-e]', (ev) => onPick(ev.currentTarget.dataset.e)));
+  `, () => on('[data-e]', (ev) => onPick(ev.currentTarget.dataset.e)), [title]);
 }
 
 // ---------- child: morning (implementation intentions) ----------
@@ -144,7 +202,7 @@ async function morningFlow() {
   const entry = { id: `${today}-morning`, type: 'morning', date: today, createdAt: Date.now() };
   const plans = s.plans.filter((p) => p.if && p.then);
 
-  emotionPicker('Tere hommikust! Kuidas sa end praegu tunned?', (emotion) => {
+  emotionPicker(SAY.morningHello, (emotion) => {
     entry.emotion = emotion;
     askSleep();
   });
@@ -152,9 +210,9 @@ async function morningFlow() {
   function askSleep() {
     render(`
       ${backBtn()}
-      <h2>Kuidas sa öösel magasid?</h2>
+      <h2>${SAY.sleep}</h2>
       <div class="list">${SLEEP.map((s) => `<button class="btn choice" data-s="${s.id}">${s.emoji} ${s.label}</button>`).join('')}</div>
-    `, () => on('[data-s]', (ev) => { entry.sleep = ev.currentTarget.dataset.s; showPlan(0); }));
+    `, () => on('[data-s]', (ev) => { entry.sleep = ev.currentTarget.dataset.s; showPlan(0); }), [SAY.sleep]);
   }
 
   async function showPlan(i) {
@@ -168,13 +226,9 @@ async function morningFlow() {
         <p><span class="kw">KUI</span> ${esc(p.if)},</p>
         <p><span class="kw">SIIS</span> ${esc(p.then)}.</p>
       </div>
-      ${voice ? '<button class="btn ghost" data-play>🔊 Kuula</button>' : ''}
-      <p class="hint">Ütle see valjult ja kujuta ette, kuidas sa seda koolis teed.</p>
+      <p class="hint">${SAY.planHint}</p>
       <button class="btn big" data-next>Ütlesin! ✓</button>
-    `, () => {
-      on('[data-play]', () => playAudio(voice));
-      on('[data-next]', () => showPlan(i + 1));
-    });
+    `, () => on('[data-next]', () => showPlan(i + 1)), [voice ? { audioId: voice } : planSentence(p), SAY.planHint]);
   }
 
   function chooseGoal() {
@@ -182,9 +236,9 @@ async function morningFlow() {
     if (!goals.length) return finish();
     render(`
       ${backBtn()}
-      <h2>Mis on sinu tänane eesmärk?</h2>
+      <h2>${SAY.goalToday}</h2>
       <div class="list">${goals.map((g, i) => `<button class="btn choice" data-g="${i}">🎯 ${esc(g)}</button>`).join('')}</div>
-    `, () => on('[data-g]', (ev) => { entry.goal = goals[+ev.currentTarget.dataset.g]; finish(); }));
+    `, () => on('[data-g]', (ev) => { entry.goal = goals[+ev.currentTarget.dataset.g]; finish(); }), [SAY.goalToday]);
   }
 
   async function finish() {
@@ -200,7 +254,7 @@ async function morningFlow() {
         <p>Sa saad sellega hakkama. 💪</p>
         <button class="btn big" data-home>Valmis</button>
       </div>
-    `, () => on('[data-home]', home));
+    `, () => on('[data-home]', home), [SAY.morningDone]);
   }
 }
 
@@ -215,7 +269,7 @@ async function eveningFlow() {
     goal: morning?.goal || null, answers: [],
   };
 
-  emotionPicker('Milline tunne oli täna kõige suurem?', (emotion) => {
+  emotionPicker(SAY.eveningHello, (emotion) => {
     entry.emotion = emotion;
     askIntensity();
   });
@@ -224,11 +278,11 @@ async function eveningFlow() {
     const e = emotionById(entry.emotion);
     render(`
       ${backBtn()}
-      <h2>${e.emoji} Kui suur see ${e.label.toLowerCase()} tunne oli?</h2>
+      <h2>${e.emoji} ${intensityQuestion(e)}</h2>
       <div class="thermo">
         ${[...INTENSITY].reverse().map((i) => `<button class="lvl l${i.value}" data-i="${i.value}">${i.label}</button>`).join('')}
       </div>
-    `, () => on('[data-i]', (ev) => { entry.intensity = +ev.currentTarget.dataset.i; askGoal(); }));
+    `, () => on('[data-i]', (ev) => { entry.intensity = +ev.currentTarget.dataset.i; askGoal(); }), [intensityQuestion(e)]);
   }
 
   function askGoal() {
@@ -237,13 +291,13 @@ async function eveningFlow() {
       if (!goals.length) return askPlaces();
       return render(`
         ${backBtn()}
-        <h2>Millist eesmärki sa täna proovisid?</h2>
+        <h2>${SAY.goalWhich}</h2>
         <div class="list">${goals.map((g, i) => `<button class="btn choice" data-g="${i}">🎯 ${esc(g)}</button>`).join('')}
         <button class="btn ghost" data-skip>Ei proovinud täna</button></div>
       `, () => {
         on('[data-g]', (ev) => { entry.goal = goals[+ev.currentTarget.dataset.g]; askGoal(); });
         on('[data-skip]', askPlaces);
-      });
+      }, [SAY.goalWhich]);
     }
     render(`
       ${backBtn()}
@@ -251,7 +305,7 @@ async function eveningFlow() {
       <p class="plan small">🎯 ${esc(entry.goal)}</p>
       <div class="list">${GOAL_RESULTS.map((r) => `<button class="btn choice" data-r="${r.id}">${r.emoji} ${r.label}</button>`).join('')}</div>
       <p class="hint">Ausalt vastata on kõige tublim.</p>
-    `, () => on('[data-r]', (ev) => { entry.goalResult = ev.currentTarget.dataset.r; askPlaces(); }));
+    `, () => on('[data-r]', (ev) => { entry.goalResult = ev.currentTarget.dataset.r; askPlaces(); }), [SAY.goalHow]);
   }
 
   function placePicker(title, extra, onPick) {
@@ -262,13 +316,13 @@ async function eveningFlow() {
         ${CONTEXTS.map((c) => `<button class="place" data-p="${c.id}"><b>${c.emoji}</b>${c.label}</button>`).join('')}
       </div>
       ${extra ? `<button class="btn ghost" data-p="none">${extra}</button>` : ''}
-    `, () => on('[data-p]', (ev) => onPick(ev.currentTarget.dataset.p)));
+    `, () => on('[data-p]', (ev) => onPick(ev.currentTarget.dataset.p)), [title]);
   }
 
   function askPlaces() {
-    placePicker('Kus oli täna kõige raskem?', 'Täna polnud raske 🙂', (hard) => {
+    placePicker(SAY.hardPlace, 'Täna polnud raske 🙂', (hard) => {
       entry.hardPlace = hard;
-      placePicker('Kus läks täna kõige paremini?', null, (good) => { entry.goodPlace = good; askQuestion(0); });
+      placePicker(SAY.goodPlace, null, (good) => { entry.goodPlace = good; askQuestion(0); });
     });
   }
 
@@ -282,16 +336,14 @@ async function eveningFlow() {
       ${backBtn()}
       <p class="step">Küsimus ${i + 1}/${questions.length}</p>
       <h2 class="question">${esc(q.text)}</h2>
-      ${voice ? '<button class="btn ghost" data-play>🔊 Kuula küsimust</button>' : ''}
       <div id="rec" class="recwrap"></div>
       <button class="btn big" data-next>Edasi →</button>
       <button class="btn ghost small" data-skip>Jätan vahele</button>
     `, (root) => {
-      if (voice) { on('[data-play]', () => playAudio(voice)); playAudio(voice); }
       recorder($('#rec', root), { onSaved: (id) => { answer.audioId = id; } });
       on('[data-next]', () => askQuestion(i + 1));
       on('[data-skip]', () => { answer.skipped = true; askQuestion(i + 1); });
-    });
+    }, [voice ? { audioId: voice } : q.text, i === 0 ? SAY.recordHint : null]);
   }
 
   async function finish() {
@@ -311,7 +363,7 @@ async function eveningFlow() {
         <p><b>Nüüd mine ja kallista emmet või issit. 🤗</b></p>
         <button class="btn big" data-home>Head ööd 🌙</button>
       </div>
-    `, () => on('[data-home]', home));
+    `, () => on('[data-home]', home), [hard ? SAY.eveningDoneHard : SAY.eveningDoneOk]);
   }
 }
 
@@ -319,17 +371,17 @@ async function eveningFlow() {
 function calmMenu() {
   render(`
     ${backBtn()}
-    <h2>Mis sind praegu aitaks?</h2>
+    <h2>${SAY.calmMenu}</h2>
     <div class="list">
       <button class="btn choice" data-c="turtle">🐢 Kilpkonn</button>
       <button class="btn choice" data-c="balloon">🎈 Õhupalli hingamine</button>
       <button class="btn choice" data-c="squeeze">✊ Pigista ja lase lahti</button>
     </div>
   `, () => {
-    on('[data-c=turtle]', turtle);
+    on('[data-c=turtle]', () => steps(TURTLE_STEPS, home));
     on('[data-c=balloon]', () => breathing(5, calmMenu));
-    on('[data-c=squeeze]', squeeze);
-  });
+    on('[data-c=squeeze]', () => steps(SQUEEZE_STEPS, home));
+  }, [SAY.calmMenu]);
 }
 
 function steps(list, done) {
@@ -345,7 +397,7 @@ function steps(list, done) {
         <button class="btn big" data-next ${st.seconds ? 'disabled' : ''}>${i === list.length - 1 ? 'Valmis ✓' : 'Edasi →'}</button>
       </div>
     `, () => {
-      on('[data-next]', () => (st.action ? st.action() : show(i + 1)));
+      on('[data-next]', () => (st.breathe ? breathing(st.breathe, () => show(i + 1)) : show(i + 1)));
       if (st.seconds) {
         let n = st.seconds;
         const t = setInterval(() => {
@@ -356,31 +408,9 @@ function steps(list, done) {
           if (n <= 0) { clearInterval(t); cd.textContent = '✓'; $('[data-next]').disabled = false; }
         }, 1000);
       }
-    });
+    }, [st.text]);
   };
   show(0);
-}
-
-function turtle() {
-  steps([
-    { emoji: '✋', text: 'Peatu! Ütle endale mõttes: STOPP.' },
-    { emoji: '🐢', text: 'Mine kilpkonnaks: tõmba pea õlgade vahele ja kallista ennast.', seconds: 5 },
-    { emoji: '🌬️', text: 'Hinga kolm korda aeglaselt sisse ja välja.', action: () => breathing(3, turtleEnd) },
-  ], turtleEnd);
-}
-function turtleEnd() {
-  steps([{ emoji: '💡', text: 'Nüüd mõtle: mis oleks hea lahendus? Võid ka täiskasvanult abi küsida.' }], home);
-}
-
-function squeeze() {
-  steps([
-    { emoji: '✊', text: 'Pigista rusikad kõvasti kokku!', seconds: 5 },
-    { emoji: '🖐️', text: 'Lase lahti. Tunne, kuidas käed on pehmed.', seconds: 5 },
-    { emoji: '🙆', text: 'Tõmba õlad kõrvadeni üles!', seconds: 5 },
-    { emoji: '😌', text: 'Lase õlad alla. Aaah.', seconds: 5 },
-    { emoji: '🦶', text: 'Suru varbad kõvasti vastu põrandat!', seconds: 5 },
-    { emoji: '🌟', text: 'Lase lahti. Sa oled nüüd rahulikum.' },
-  ], home);
 }
 
 function breathing(cycles, done) {
@@ -396,14 +426,14 @@ function breathing(cycles, done) {
     let c = 0;
     const inhale = () => {
       if (!b.isConnected) return;
-      if (c >= cycles) { t.textContent = 'Tubli! 🌟'; return setTimeout(() => b.isConnected && done(), 1500); }
-      t.textContent = 'Hinga sisse… puhu õhupall suureks';
+      if (c >= cycles) { t.textContent = `${SAY.breatheDone} 🌟`; speak([SAY.breatheDone]); return setTimeout(() => b.isConnected && done(), 1500); }
+      t.textContent = SAY.breatheIn; speak([SAY.breatheIn]);
       b.className = 'balloon grow';
       setTimeout(exhale, 4000);
     };
     const exhale = () => {
       if (!b.isConnected) return;
-      t.textContent = 'Hinga välja… aeglaselt';
+      t.textContent = SAY.breatheOut; speak([SAY.breatheOut]);
       b.className = 'balloon shrink';
       c += 1; n.textContent = `${c}/${cycles}`;
       setTimeout(inhale, 6000);
@@ -677,7 +707,10 @@ async function parentSettings() {
       const plans = [0, 1, 2].map((i) => ({ if: $(`[data-pif="${i}"]`).value.trim(), then: $(`[data-pthen="${i}"]`).value.trim() })).filter((p) => p.if && p.then);
       const rewards = [0, 1, 2, 3, 4].map((i) => ({ text: $(`[data-rtext="${i}"]`).value.trim(), cost: +$(`[data-rcost="${i}"]`).value })).filter((r) => r.text && r.cost > 0);
       await setSetting('goals', goals); await setSetting('plans', plans); await setSetting('rewards', rewards);
-      $('[data-saved]').textContent = 'Salvestatud ✓';
+      const msg = $('[data-saved]');
+      msg.textContent = 'Salvestatud ✓ Loon plaanidele häält…';
+      const ok = (await Promise.all(plans.map((p) => ensureVoice(planSentence(p))))).every(Boolean);
+      if (msg.isConnected) msg.textContent = ok ? 'Salvestatud ✓ Hääl valmis ✓' : 'Salvestatud ✓ Uute plaanide hääle loomiseks lülita korraks internet sisse ja salvesta uuesti.';
     });
     on('[data-export]', exportBackup);
     $('[data-import]').addEventListener('change', (ev) => importBackup(ev.target.files[0]));

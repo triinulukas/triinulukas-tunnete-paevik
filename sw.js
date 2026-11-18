@@ -1,9 +1,15 @@
 // Offline-first: the app works with no internet after the first install.
-const CACHE = 'minu-paev-v2';
-const FILES = ['./', './index.html', './styles.css', './app.js', './db.js', './logic.js', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
+const CACHE = 'minu-paev-v3';
+const FILES = ['./', './index.html', './styles.css', './app.js', './db.js', './logic.js', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png', './audio/index.json'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await c.addAll(FILES);
+    const voices = await (await c.match('./audio/index.json')).json();
+    await c.addAll(voices.map((h) => `./audio/${h}.m4a`));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (e) => {

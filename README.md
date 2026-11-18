@@ -11,6 +11,8 @@ Väike veebiäpp (PWA) 6–8-aastasele lapsele. Laps õpib selle abil oma tundei
 | 🌙 Õhtu | Päeva suurim tunne → kui suur see oli (termomeeter) → kuidas eesmärk läks → kus oli raskem / kus parem → 2 häälküsimust | ~3 min |
 | 🐢 Igal ajal | Rahunemisnurk: kilpkonn, õhupalli hingamine, pigista ja lase lahti | 1–2 min |
 
+**Äpp loeb iga küsimuse ise ette** (eesti hääl: TartuNLP Neurokõne, kõneleja „mari“), nii et laps ei pea lugema. Ettelugemise saab avalehel 🔊 nupust välja lülitada ja 🔊 nupuga paremal üleval saab küsimust uuesti kuulata. Vanema kirjutatud kui-siis plaanidele luuakse hääl salvestamisel (selleks peab internet korraks sees olema). Vanem võib küsimused ka oma häälega sisse lugeda, siis kasutatakse tema häält.
+
 Iga hommiku ja õhtu eest saab laps tähe. Vanem saab anda boonustähti ja lunastada auhindu (ühine aeg, mitte toit ega ekraan).
 
 ## Vanema vaade (PIN-iga)
@@ -42,6 +44,12 @@ PIN hoiab last juhuslikult vanema vaatesse sattumast. See ei ole turvamehhanism.
 ```bash
 python3 -m http.server 8765   # ava http://localhost:8765
 npm test                      # loogika testid
+```
+
+Kui muudad äpi ettelaetavaid lauseid (`SAY`, küsimused või rahunemise sammud failis `logic.js`), genereeri helid uuesti:
+
+```bash
+node scripts/generate-audio.mjs   # macOS, kasutab afconvert'i; saadab teenusele ainult äpi üldised laused
 ```
 
 Ühtegi sõltuvust ega build-sammu pole. Tavaline HTML, CSS ja JS (ES-moodulid).
