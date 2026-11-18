@@ -1,5 +1,5 @@
 // Offline-first: the app works with no internet after the first install.
-const CACHE = 'minu-paev-v4';
+const CACHE = 'minu-paev-v5';
 const FILES = ['./', './index.html', './styles.css', './app.js', './db.js', './logic.js', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png', './audio/index.json'];
 
 self.addEventListener('install', (e) => {

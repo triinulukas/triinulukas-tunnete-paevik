@@ -475,8 +475,8 @@ function parentNav(active) {
     on('[data-tab]', (ev) => PARENT_TABS[ev.currentTarget.dataset.tab]());
     on('[data-exit]', home);
   });
-  return `<nav class="pnav">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${k === active ? 'active' : ''}">${l}</button>`).join('')}
-    <button data-exit>✕</button></nav>`;
+  return `<div class="ptop"><button class="back" data-exit>← Tagasi</button></div>
+    <nav class="pnav">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${k === active ? 'active' : ''}">${l}</button>`).join('')}</nav>`;
 }
 
 const parentHome = () => parentDays();

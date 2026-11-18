@@ -83,10 +83,11 @@ h3 { margin: 0 0 8px; font-size: 1.05rem; }
 @keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
 
 /* parent */
-.pnav { display: flex; gap: 4px; overflow-x: auto; margin: -4px -4px 8px; padding: 4px; }
+.ptop { display: flex; margin-bottom: 4px; }
+.ptop .back { font-size: 1.1rem; font-weight: 700; padding: 8px 0; }
+.pnav { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
 .pnav button { border: 0; background: #e7e6fb; color: var(--primary); border-radius: 99px; padding: 8px 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .pnav button.active { background: var(--primary); color: #fff; }
-.pnav [data-exit] { margin-left: auto; }
 .card { background: var(--card); border-radius: 16px; padding: 14px; margin: 12px 0; }
 .card p { margin: 6px 0; }
 .cardhead { display: flex; justify-content: space-between; }
@@ -114,7 +115,7 @@ textarea { min-height: 60px; }
 label.btn { display: block; }
 
 @media print {
-  .pnav, .btn, .hint { display: none !important; }
+  .pnav, .ptop, .btn, .hint { display: none !important; }
   body, :root { background: #fff; }
   .card { border: 1px solid #ccc; break-inside: avoid; }
 }
