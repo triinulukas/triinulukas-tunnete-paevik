@@ -119,3 +119,14 @@ label.btn { display: block; }
   .card { border: 1px solid #ccc; break-inside: avoid; }
 }
 .btn.ghost.small { display: block; margin: 0 auto; }
+.places { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.place { background: #fff; border: 0; border-radius: var(--radius); padding: 16px 8px; font-size: 1.1rem; font-weight: 600; color: var(--ink); cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.06); }
+.place b { display: block; font-size: 2.4rem; }
+select { width: 100%; font: inherit; border: 1px solid #d8d6ee; border-radius: 10px; padding: 10px; margin: 6px 0; background: #fff; color: var(--ink); }
+.lbl { display: block; font-weight: 700; font-size: .9rem; margin-top: 8px; }
+.hbar2 { display: grid; grid-template-columns: 120px 1fr 20px 1fr 20px; gap: 6px; align-items: center; margin: 4px 0; font-size: .9rem; }
+.hbar2 div { background: #f0eff8; border-radius: 6px; height: 12px; overflow: hidden; }
+.hbar2 i, .legend i { display: block; height: 100%; }
+i.hard { background: #ff8a80; } i.good { background: #7ad3a0; }
+.legend { font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }

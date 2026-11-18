@@ -46,6 +46,21 @@ export const GOAL_RESULTS = [
   { id: 'no', label: 'Seekord mitte', emoji: '🌱', score: 0 },
 ];
 
+export const SLEEP = [
+  { id: 'good', label: 'Hästi', emoji: '😊' },
+  { id: 'ok', label: 'Nii ja naa', emoji: '😐' },
+  { id: 'bad', label: 'Halvasti', emoji: '🥱' },
+];
+
+export const CONTEXTS = [
+  { id: 'tund', label: 'Tunnis', emoji: '📚' },
+  { id: 'vahetund', label: 'Vahetunnis', emoji: '🏃' },
+  { id: 'trenn', label: 'Trennis', emoji: '⚽' },
+  { id: 'muusika', label: 'Muusikakoolis', emoji: '🎺' },
+  { id: 'kodu', label: 'Kodus', emoji: '🏠' },
+  { id: 'mujal', label: 'Mujal', emoji: '📍' },
+];
+
 export const DEFAULT_SETTINGS = {
   goals: [
     'Tõstan käe, enne kui räägin',
@@ -129,6 +144,36 @@ export function computeStats(entries, { today, days = 28 }) {
     goalRate: goalN ? goalSum / goalN : null,
     hardDays: recent.filter(isHardDay).length,
   };
+}
+
+function inWindow(key, today, days) {
+  const i = dayIndex(key); const end = dayIndex(today);
+  return i <= end && i > end - days;
+}
+
+// Where was it hardest / best? Counts per context over the window (evening entries).
+export function computeContextStats(entries, { today, days = 28 }) {
+  const hard = Object.fromEntries(CONTEXTS.map((c) => [c.id, 0]));
+  const good = Object.fromEntries(CONTEXTS.map((c) => [c.id, 0]));
+  for (const e of entries) {
+    if (e.type !== 'evening' || !inWindow(e.date, today, days)) continue;
+    if (e.hardPlace in hard) hard[e.hardPlace] += 1;
+    if (e.goodPlace in good) good[e.goodPlace] += 1;
+  }
+  return { hard, good };
+}
+
+// Does a bad night predict a hard day? Joins morning sleep with the same day's evening.
+export function computeSleepStats(entries, { today, days = 28 }) {
+  const byDate = {};
+  for (const e of entries) if (inWindow(e.date, today, days)) (byDate[e.date] ??= {})[e.type] = e;
+  const out = Object.fromEntries(SLEEP.map((s) => [s.id, { days: 0, hard: 0 }]));
+  for (const { morning, evening } of Object.values(byDate)) {
+    if (!morning?.sleep || !evening || !(morning.sleep in out)) continue;
+    out[morning.sleep].days += 1;
+    if (isHardDay(evening)) out[morning.sleep].hard += 1;
+  }
+  return out;
 }
 
 export function starBalance(ledger) {

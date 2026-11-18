@@ -7,8 +7,8 @@ Väike veebiäpp (PWA) 6–8-aastasele lapsele. Laps õpib selle abil oma tundei
 
 | Millal | Mis | Kestus |
 |---|---|---|
-| 🌅 Hommik | Tunne → oma **kui-siis plaanid** ütleb valjult → valib päeva eesmärgi | ~1 min |
-| 🌙 Õhtu | Päeva suurim tunne → kui suur see oli (termomeeter) → kuidas eesmärk läks → 2 häälküsimust | ~3 min |
+| 🌅 Hommik | Tunne → kuidas magas → oma **kui-siis plaanid** ütleb valjult → valib päeva eesmärgi | ~1 min |
+| 🌙 Õhtu | Päeva suurim tunne → kui suur see oli (termomeeter) → kuidas eesmärk läks → kus oli raskem / kus parem → 2 häälküsimust | ~3 min |
 | 🐢 Igal ajal | Rahunemisnurk: kilpkonn, õhupalli hingamine, pigista ja lase lahti | 1–2 min |
 
 Iga hommiku ja õhtu eest saab laps tähe. Vanem saab anda boonustähti ja lunastada auhindu (ühine aeg, mitte toit ega ekraan).
@@ -16,7 +16,8 @@ Iga hommiku ja õhtu eest saab laps tähe. Vanem saab anda boonustähti ja lunas
 ## Vanema vaade (PIN-iga)
 
 - **Päevad**: sissekanded, lapse häälvastuste kuulamine, vanema märkused.
-- **Mustrid**: viimase 4 nädala rasked päevad nädalapäeviti, tunded, eesmärkide õnnestumine. Prinditav arenguvestluseks.
+- **Juhtumid**: ABC-logi (mis juhtus enne → mida ta tegi → mis järgnes) psühholoogi või arenguvestluse jaoks.
+- **Mustrid**: viimase 4 nädala rasked päevad nädalapäeviti, tunded, eesmärkide õnnestumine, kus on raskem ja kus parem, uni ja rasked päevad, juhtumid. Prinditav.
 - **Tähed**: boonustähed ja auhindade lunastamine.
 - **Juhend**: emotsioonide juhendamine, parandamine pärast tülli, selged korraldused.
 - **Seaded**: eesmärgid, kui-siis plaanid, auhinnad, oma häälega sisseloetud küsimused, varukoopia.
@@ -30,6 +31,7 @@ PIN hoiab last juhuslikult vanema vaatesse sattumast. See ei ole turvamehhanism.
 - **Kui-siis plaanid** (*implementation intentions*, Gollwitzer 1999). Gawrilow jt 2011 näitasid, et need parandavad enesekontrolli ka ADHD-ga lastel.
 - **Enesejälgimine** (*self-monitoring*). Lapse enda hinnang eesmärgi kohta parandab tunnis keskendumist (metaanalüüsid, nt Bruhn jt 2015).
 - **Positiivne kinnitus / žetoonisüsteem**. See on osa vanemaprogrammidest (Incredible Years / „Imelised aastad“, Triple P): tasu on kiire ja väike ning seda karistuseks ära ei võeta.
+- **ABC-vaatlus** (*antecedent–behavior–consequence*) on funktsionaalse käitumishinnangu põhivahend. **Uni** on oluline, sest unepuudus võib tekitada ADHD-sarnaseid sümptomeid.
 - **Kilpkonna tehnika** (Schneider 1974; kasutusel Incredible Years Dina programmis), **aeglane hingamine** ja **lihaste lõdvestamine**.
 - **Positiivsed küsimused** (*savoring*, tugevustele keskenduv lähenemine). Õhtu lõpeb alati millegi heaga.
 

@@ -1,7 +1,8 @@
 import { db, getSetting, setSetting } from './db.js';
 import {
-  EMOTIONS, INTENSITY, GOAL_RESULTS, ALL_QUESTIONS, DEFAULT_SETTINGS, WEEKDAYS,
-  dayKey, questionsForDay, emotionById, computeStats, starBalance, nextReward, escapeHtml as esc,
+  EMOTIONS, INTENSITY, GOAL_RESULTS, ALL_QUESTIONS, DEFAULT_SETTINGS, WEEKDAYS, SLEEP, CONTEXTS,
+  dayKey, questionsForDay, emotionById, computeStats, computeContextStats, computeSleepStats,
+  starBalance, nextReward, escapeHtml as esc,
 } from './logic.js';
 
 const app = document.getElementById('app');
@@ -145,8 +146,16 @@ async function morningFlow() {
 
   emotionPicker('Tere hommikust! Kuidas sa end praegu tunned?', (emotion) => {
     entry.emotion = emotion;
-    showPlan(0);
+    askSleep();
   });
+
+  function askSleep() {
+    render(`
+      ${backBtn()}
+      <h2>Kuidas sa öösel magasid?</h2>
+      <div class="list">${SLEEP.map((s) => `<button class="btn choice" data-s="${s.id}">${s.emoji} ${s.label}</button>`).join('')}</div>
+    `, () => on('[data-s]', (ev) => { entry.sleep = ev.currentTarget.dataset.s; showPlan(0); }));
+  }
 
   async function showPlan(i) {
     if (i >= plans.length) return chooseGoal();
@@ -225,7 +234,7 @@ async function eveningFlow() {
   function askGoal() {
     const goals = s.goals.filter(Boolean);
     if (!entry.goal) {
-      if (!goals.length) return askQuestion(0);
+      if (!goals.length) return askPlaces();
       return render(`
         ${backBtn()}
         <h2>Millist eesmärki sa täna proovisid?</h2>
@@ -233,7 +242,7 @@ async function eveningFlow() {
         <button class="btn ghost" data-skip>Ei proovinud täna</button></div>
       `, () => {
         on('[data-g]', (ev) => { entry.goal = goals[+ev.currentTarget.dataset.g]; askGoal(); });
-        on('[data-skip]', () => askQuestion(0));
+        on('[data-skip]', askPlaces);
       });
     }
     render(`
@@ -242,7 +251,25 @@ async function eveningFlow() {
       <p class="plan small">🎯 ${esc(entry.goal)}</p>
       <div class="list">${GOAL_RESULTS.map((r) => `<button class="btn choice" data-r="${r.id}">${r.emoji} ${r.label}</button>`).join('')}</div>
       <p class="hint">Ausalt vastata on kõige tublim.</p>
-    `, () => on('[data-r]', (ev) => { entry.goalResult = ev.currentTarget.dataset.r; askQuestion(0); }));
+    `, () => on('[data-r]', (ev) => { entry.goalResult = ev.currentTarget.dataset.r; askPlaces(); }));
+  }
+
+  function placePicker(title, extra, onPick) {
+    render(`
+      ${backBtn()}
+      <h2>${title}</h2>
+      <div class="places">
+        ${CONTEXTS.map((c) => `<button class="place" data-p="${c.id}"><b>${c.emoji}</b>${c.label}</button>`).join('')}
+      </div>
+      ${extra ? `<button class="btn ghost" data-p="none">${extra}</button>` : ''}
+    `, () => on('[data-p]', (ev) => onPick(ev.currentTarget.dataset.p)));
+  }
+
+  function askPlaces() {
+    placePicker('Kus oli täna kõige raskem?', 'Täna polnud raske 🙂', (hard) => {
+      entry.hardPlace = hard;
+      placePicker('Kus läks täna kõige paremini?', null, (good) => { entry.goodPlace = good; askQuestion(0); });
+    });
   }
 
   async function askQuestion(i) {
@@ -407,7 +434,7 @@ async function parentGate() {
 }
 
 function parentNav(active) {
-  const tabs = [['days', 'Päevad'], ['patterns', 'Mustrid'], ['stars', 'Tähed'], ['guide', 'Juhend'], ['settings', 'Seaded']];
+  const tabs = [['days', 'Päevad'], ['incidents', 'Juhtumid'], ['patterns', 'Mustrid'], ['stars', 'Tähed'], ['guide', 'Juhend'], ['settings', 'Seaded']];
   setTimeout(() => {
     on('[data-tab]', (ev) => PARENT_TABS[ev.currentTarget.dataset.tab]());
     on('[data-exit]', home);
@@ -434,8 +461,9 @@ async function parentDays() {
       const res = GOAL_RESULTS.find((r) => r.id === e?.goalResult);
       return `<div class="card">
         <div class="cardhead"><b>${d}</b> <span>${WEEKDAYS[(new Date(`${d}T12:00`).getDay() + 6) % 7]}</span></div>
-        <p>🌅 ${emo(m)} ${m?.goal ? `· 🎯 ${esc(m.goal)}` : ''}</p>
+        <p>🌅 ${emo(m)} ${m?.sleep ? `· uni: ${SLEEP.find((s) => s.id === m.sleep)?.label}` : ''} ${m?.goal ? `· 🎯 ${esc(m.goal)}` : ''}</p>
         <p>🌙 ${emo(e)} ${e?.intensity ? `(${e.intensity}/5)` : ''} ${res ? `· ${res.emoji} ${res.label}` : ''}</p>
+        ${e?.hardPlace || e?.goodPlace ? `<p>Raskem: ${placeLabel(e.hardPlace)} · Parem: ${placeLabel(e.goodPlace)}</p>` : ''}
         ${(e?.answers || []).filter(Boolean).map((a) => `<div class="ans"><span>${esc(a.text)}</span>
           ${a.audioId ? `<button class="btn small ghost" data-play="${a.audioId}">▶️</button>` : '<i>—</i>'}</div>`).join('')}
         <textarea data-note="${d}" placeholder="Vanema märkus (nt mis koolis juhtus)">${esc(notes[d])}</textarea>
@@ -447,10 +475,60 @@ async function parentDays() {
   });
 }
 
+function placeLabel(id) {
+  if (id === 'none') return 'polnud raske';
+  const c = CONTEXTS.find((x) => x.id === id);
+  return c ? `${c.emoji} ${c.label}` : '—';
+}
+
+async function parentIncidents() {
+  const list = (await db.all('incidents')).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+  render(`
+    ${parentNav('incidents')}
+    <h2>Juhtumid</h2>
+    <p class="hint">Pane kirja konkreetne olukord, kui sellest kuuled. Psühholoog näeb siit mustreid: mis eelneb ja mis järgneb.</p>
+    <div class="card">
+      <input type="date" data-f="date" value="${dayKey()}">
+      <select data-f="place">${CONTEXTS.map((c) => `<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
+      <label class="lbl">Mis juhtus vahetult enne?</label>
+      <textarea data-f="before" placeholder="nt pidi vaikselt ülesannet tegema, oli juba valmis"></textarea>
+      <label class="lbl">Mida ta tegi?</label>
+      <textarea data-f="behavior" placeholder="nt hakkas häälitsema, karjus vastu"></textarea>
+      <label class="lbl">Mis järgnes?</label>
+      <textarea data-f="after" placeholder="nt õpetaja tegi märkuse, klass naeris"></textarea>
+      <button class="btn" data-add>Lisa juhtum</button>
+    </div>
+    ${list.map((x) => `<div class="card">
+      <div class="cardhead"><b>${x.date}</b><span>${placeLabel(x.place)}</span></div>
+      <p><b>Enne:</b> ${esc(x.before) || '—'}</p>
+      <p><b>Tegi:</b> ${esc(x.behavior) || '—'}</p>
+      <p><b>Järgnes:</b> ${esc(x.after) || '—'}</p>
+      <button class="btn small ghost" data-del="${x.id}">Kustuta</button>
+    </div>`).join('')}
+  `, () => {
+    on('[data-add]', async () => {
+      const f = Object.fromEntries($$('[data-f]').map((el) => [el.dataset.f, el.value.trim()]));
+      if (!f.behavior && !f.before && !f.after) return;
+      await db.put('incidents', { id: newId(), createdAt: Date.now(), ...f });
+      parentIncidents();
+    });
+    on('[data-del]', async (ev) => {
+      if (!confirm('Kustutan selle juhtumi?')) return;
+      await db.del('incidents', ev.currentTarget.dataset.del); parentIncidents();
+    });
+  });
+}
+
 async function parentPatterns() {
   const today = dayKey();
-  const evenings = (await db.all('entries')).filter((e) => e.type === 'evening');
+  const all = await db.all('entries');
+  const evenings = all.filter((e) => e.type === 'evening');
   const st = computeStats(evenings, { today, days: 28 });
+  const ctx = computeContextStats(all, { today, days: 28 });
+  const sleep = computeSleepStats(all, { today, days: 28 });
+  const since = dayKey(new Date(Date.now() - 28 * 86400000));
+  const incidents = (await db.all('incidents')).filter((x) => x.date > since).sort((a, b) => a.date.localeCompare(b.date));
+  const ctxMax = Math.max(1, ...Object.values(ctx.hard), ...Object.values(ctx.good));
   const max = Math.max(1, ...Object.values(st.emotionCounts));
   const noteKeys = (await db.keys('kv')).filter((k) => String(k).startsWith('note:')).sort();
   const notes = [];
@@ -473,6 +551,18 @@ async function parentPatterns() {
     <div class="card"><h3>Tunded</h3>
       ${EMOTIONS.map((e) => `<div class="hbar"><span>${e.emoji} ${e.label}</span><div><i style="width:${(st.emotionCounts[e.id] / max) * 100}%;background:${e.color}"></i></div><b>${st.emotionCounts[e.id]}</b></div>`).join('')}
     </div>
+    <div class="card"><h3>Kus on raskem, kus parem</h3>
+      ${CONTEXTS.map((c) => `<div class="hbar2"><span>${c.emoji} ${c.label}</span>
+        <div><i class="hard" style="width:${(ctx.hard[c.id] / ctxMax) * 100}%"></i></div><b>${ctx.hard[c.id]}</b>
+        <div><i class="good" style="width:${(ctx.good[c.id] / ctxMax) * 100}%"></i></div><b>${ctx.good[c.id]}</b></div>`).join('')}
+      <p class="legend"><i class="hard"></i> kõige raskem <i class="good"></i> kõige parem</p>
+    </div>
+    <div class="card"><h3>Uni ja rasked päevad</h3>
+      ${SLEEP.map((s) => `<p>${s.emoji} Magas ${s.label.toLowerCase()}: <b>${sleep[s.id].hard}/${sleep[s.id].days}</b> rasket päeva</p>`).join('')}
+      <p class="hint">Arvesse lähevad päevad, kus on täidetud nii hommik kui õhtu.</p>
+    </div>
+    ${incidents.length ? `<div class="card"><h3>Juhtumid (${incidents.length})</h3>${incidents.map((x) => `<p><b>${x.date}</b> ${placeLabel(x.place)}<br>
+      Enne: ${esc(x.before) || '—'} · Tegi: ${esc(x.behavior) || '—'} · Järgnes: ${esc(x.after) || '—'}</p>`).join('')}</div>` : ''}
     ${notes.length ? `<div class="card"><h3>Vanema märkused</h3>${notes.map(([d, v]) => `<p><b>${d}</b>: ${esc(v)}</p>`).join('')}</div>` : ''}
     <button class="btn" data-print>🖨️ Prindi / PDF</button>
   `, () => on('[data-print]', () => window.print()));
@@ -599,14 +689,14 @@ async function parentSettings() {
   });
 }
 
-const PARENT_TABS = { days: parentDays, patterns: parentPatterns, stars: parentStars, guide: parentGuide, settings: parentSettings };
+const PARENT_TABS = { days: parentDays, incidents: parentIncidents, patterns: parentPatterns, stars: parentStars, guide: parentGuide, settings: parentSettings };
 
 // ---------- backup ----------
 const blobToDataUrl = (b) => new Promise((r) => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
 
 async function exportBackup() {
   const out = { version: 1, exportedAt: new Date().toISOString() };
-  for (const s of ['entries', 'stars']) out[s] = await db.all(s);
+  for (const s of ['entries', 'stars', 'incidents']) out[s] = await db.all(s);
   const kvKeys = await db.keys('kv');
   out.kv = Object.fromEntries(await Promise.all(kvKeys.map(async (k) => [k, await db.get('kv', k)])));
   const audioKeys = await db.keys('audio');
@@ -623,6 +713,7 @@ async function importBackup(file) {
   await db.clearAll();
   for (const e of data.entries || []) await db.put('entries', e);
   for (const s of data.stars || []) await db.put('stars', s);
+  for (const x of data.incidents || []) await db.put('incidents', x);
   for (const [k, v] of Object.entries(data.kv || {})) await db.put('kv', v, k);
   for (const [k, v] of Object.entries(data.audio || {})) await db.put('audio', await (await fetch(v)).blob(), k);
   alert('Taastatud ✓');

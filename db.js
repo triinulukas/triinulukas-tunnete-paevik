@@ -1,17 +1,19 @@
 // Tiny IndexedDB wrapper. Everything stays on this device.
 const DB_NAME = 'tunnete-paevik';
-const STORES = ['entries', 'audio', 'kv', 'stars'];
+const STORES = ['entries', 'audio', 'kv', 'stars', 'incidents'];
 let dbPromise;
 
 function open() {
   dbPromise ??= new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
       const db = req.result;
-      db.createObjectStore('entries', { keyPath: 'id' });
-      db.createObjectStore('audio');
-      db.createObjectStore('kv');
-      db.createObjectStore('stars', { keyPath: 'id', autoIncrement: true });
+      const add = (name, opts) => db.objectStoreNames.contains(name) || db.createObjectStore(name, opts);
+      add('entries', { keyPath: 'id' });
+      add('audio');
+      add('kv');
+      add('stars', { keyPath: 'id', autoIncrement: true });
+      add('incidents', { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

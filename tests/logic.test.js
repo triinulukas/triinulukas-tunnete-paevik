@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dayKey, dayIndex, weekdayOf, questionsForDay, computeStats,
-  starBalance, nextReward, escapeHtml, isHardDay,
+  starBalance, nextReward, escapeHtml, isHardDay, computeContextStats, computeSleepStats,
 } from '../logic.js';
 
 test('dayKey formats local date', () => {
@@ -60,6 +60,34 @@ test('starBalance and nextReward', () => {
   assert.equal(nextReward(2, rewards).remaining, 3);
   assert.equal(nextReward(6, rewards).reachable.length, 1);
   assert.equal(nextReward(99, rewards).next, null);
+});
+
+test('computeContextStats counts hard and good places in window', () => {
+  const entries = [
+    { type: 'evening', date: '2026-11-18', hardPlace: 'tund', goodPlace: 'trenn' },
+    { type: 'evening', date: '2026-11-17', hardPlace: 'tund', goodPlace: 'vahetund' },
+    { type: 'evening', date: '2026-11-16', hardPlace: 'none', goodPlace: 'trenn' },
+    { type: 'morning', date: '2026-11-18', hardPlace: 'kodu' },
+    { type: 'evening', date: '2026-09-01', hardPlace: 'kodu' },
+  ];
+  const s = computeContextStats(entries, { today: '2026-11-18' });
+  assert.equal(s.hard.tund, 2);
+  assert.equal(s.hard.kodu, 0);
+  assert.equal(s.good.trenn, 2);
+});
+
+test('computeSleepStats joins morning sleep with same-day evening', () => {
+  const entries = [
+    { type: 'morning', date: '2026-11-18', sleep: 'bad' },
+    { type: 'evening', date: '2026-11-18', emotion: 'vihane', intensity: 4 },
+    { type: 'morning', date: '2026-11-17', sleep: 'good' },
+    { type: 'evening', date: '2026-11-17', emotion: 'roomus', intensity: 3 },
+    { type: 'morning', date: '2026-11-16', sleep: 'bad' }, // no evening -> ignored
+  ];
+  const s = computeSleepStats(entries, { today: '2026-11-18' });
+  assert.deepEqual(s.bad, { days: 1, hard: 1 });
+  assert.deepEqual(s.good, { days: 1, hard: 0 });
+  assert.deepEqual(s.ok, { days: 0, hard: 0 });
 });
 
 test('escapeHtml', () => {
