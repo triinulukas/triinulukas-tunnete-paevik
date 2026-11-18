@@ -4,6 +4,7 @@ import {
   dayKey, questionsForDay, emotionById, computeStats, computeContextStats, computeSleepStats,
   starBalance, nextReward, escapeHtml as esc,
   SAY, TURTLE_STEPS, SQUEEZE_STEPS, intensityQuestion, planSentence, textHash, TTS_SPEAKER,
+  weekView, WEEK_ICONS, floatWavToPcm16,
 } from './logic.js';
 
 const app = document.getElementById('app');
@@ -90,7 +91,8 @@ async function ensureVoice(text) {
       body: JSON.stringify({ text, speaker: TTS_SPEAKER, speed: 0.95 }),
     });
     if (!res.ok) return false;
-    await db.put('audio', await res.blob(), `tts:${h}`);
+    const wav = floatWavToPcm16(await res.arrayBuffer());
+    await db.put('audio', new Blob([wav], { type: 'audio/wav' }), `tts:${h}`);
     return true;
   } catch { return false; }
 }
@@ -152,9 +154,10 @@ function celebrate() {
 // ---------- child: home ----------
 async function home() {
   const today = dayKey();
-  const [bal, s, morning, evening] = await Promise.all([
-    stars(), settings(), db.get('entries', `${today}-morning`), db.get('entries', `${today}-evening`),
-  ]);
+  const [bal, s, entries] = await Promise.all([stars(), settings(), db.all('entries')]);
+  const morning = entries.find((e) => e.id === `${today}-morning`);
+  const evening = entries.find((e) => e.id === `${today}-evening`);
+  const week = weekView(entries, today);
   const { next, remaining, reachable } = nextReward(bal, s.rewards);
   const hour = new Date().getHours();
   await ready;
@@ -162,6 +165,9 @@ async function home() {
     <header class="top"><h1>Minu päev</h1><button class="sound" data-sound>${soundOn ? '🔊' : '🔇'}</button><div class="stars">⭐ ${bal}</div></header>
     ${next ? `<p class="reward">Veel <b>${remaining}</b> ⭐ ja saad: <b>${esc(next.text)}</b></p>` : ''}
     ${reachable.length ? `<p class="reward ok">Sul on piisavalt tähti: <b>${esc(reachable.at(-1).text)}</b>. Näita emmele või issile!</p>` : ''}
+    <div class="week" aria-label="Minu nädal">
+      ${week.map((d) => `<div class="day ${d.status} ${d.isToday ? 'today' : ''}"><span>${WEEK_ICONS[d.status]}</span><small>${d.label}</small></div>`).join('')}
+    </div>
     <div class="menu">
       <button class="tile morning ${hour < 12 ? 'suggest' : ''}" data-go="morning">🌅<span>Hommik</span>${morning ? '<i>✓</i>' : ''}</button>
       <button class="tile evening ${hour >= 17 ? 'suggest' : ''}" data-go="evening">🌙<span>Õhtu</span>${evening ? '<i>✓</i>' : ''}</button>

@@ -13,6 +13,8 @@ Väike veebiäpp (PWA) 6–8-aastasele lapsele. Laps õpib selle abil oma tundei
 
 **Äpp loeb iga küsimuse ise ette** (eesti hääl: TartuNLP Neurokõne, kõneleja „mari“), nii et laps ei pea lugema. Ettelugemise saab avalehel 🔊 nupust välja lülitada ja 🔊 nupuga paremal üleval saab küsimust uuesti kuulata. Vanema kirjutatud kui-siis plaanidele luuakse hääl salvestamisel (selleks peab internet korraks sees olema). Vanem võib küsimused ka oma häälega sisse lugeda, siis kasutatakse tema häält.
 
+Avalehel on **„Minu nädal“**: 🌟 eesmärk õnnestus, 👍 natuke, 🌱 kasvab veel. Laps näeb ainult oma edenemist, mitte raskete päevade statistikat, sest see jääb vanema vaatesse.
+
 Iga hommiku ja õhtu eest saab laps tähe. Vanem saab anda boonustähti ja lunastada auhindu (ühine aeg, mitte toit ega ekraan).
 
 ## Vanema vaade (PIN-iga)

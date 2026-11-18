@@ -241,6 +241,49 @@ export function computeSleepStats(entries, { today, days = 28 }) {
   return out;
 }
 
+// The child's own week (Mon–Sun containing `today`): only positive/neutral symbols, never "failed".
+export function weekView(entries, today) {
+  const start = dayIndex(today) - weekdayOf(today);
+  const evenings = Object.fromEntries(entries.filter((e) => e.type === 'evening').map((e) => [e.date, e]));
+  return WEEKDAYS.map((label, i) => {
+    const key = dayKey(new Date((start + i) * 86400000 + 12 * 3600000));
+    const e = evenings[key];
+    let status = 'empty';
+    if (start + i > dayIndex(today)) status = 'future';
+    else if (e) status = e.goalResult || 'done';
+    return { label, date: key, status, isToday: key === today };
+  });
+}
+
+export const WEEK_ICONS = { yes: '🌟', partly: '👍', no: '🌱', done: '⭐', empty: '', future: '' };
+
+// TartuNLP returns 32-bit float WAV; Safari/iOS plays 16-bit PCM WAV reliably. Returns the input if not float.
+export function floatWavToPcm16(buf) {
+  const v = new DataView(buf);
+  if (buf.byteLength < 12 || v.getUint32(0, false) !== 0x52494646) return buf; // 'RIFF'
+  let fmt = null; let data = null;
+  for (let p = 12; p + 8 <= buf.byteLength;) {
+    const id = v.getUint32(p, false); const size = v.getUint32(p + 4, true);
+    if (id === 0x666d7420) fmt = { format: v.getUint16(p + 8, true), channels: v.getUint16(p + 10, true), rate: v.getUint32(p + 12, true), bits: v.getUint16(p + 22, true) };
+    if (id === 0x64617461) data = { offset: p + 8, size: Math.min(size, buf.byteLength - p - 8) };
+    p += 8 + size + (size % 2);
+  }
+  if (!fmt || !data || fmt.format !== 3 || fmt.bits !== 32) return buf;
+  const n = Math.floor(data.size / 4);
+  const out = new ArrayBuffer(44 + n * 2); const o = new DataView(out);
+  const str = (p, s) => [...s].forEach((c, i) => o.setUint8(p + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); o.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); o.setUint32(16, 16, true); o.setUint16(20, 1, true); o.setUint16(22, fmt.channels, true);
+  o.setUint32(24, fmt.rate, true); o.setUint32(28, fmt.rate * fmt.channels * 2, true);
+  o.setUint16(32, fmt.channels * 2, true); o.setUint16(34, 16, true);
+  str(36, 'data'); o.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const x = Math.max(-1, Math.min(1, v.getFloat32(data.offset + i * 4, true)));
+    o.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true);
+  }
+  return out;
+}
+
 export function starBalance(ledger) {
   return ledger.reduce((sum, s) => sum + s.delta, 0);
 }

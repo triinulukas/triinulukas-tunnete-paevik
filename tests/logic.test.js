@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   dayKey, dayIndex, weekdayOf, questionsForDay, computeStats,
   starBalance, nextReward, escapeHtml, isHardDay, computeContextStats, computeSleepStats,
-  textHash, speakableTexts, planSentence, DEFAULT_SETTINGS,
+  textHash, speakableTexts, planSentence, DEFAULT_SETTINGS, weekView, WEEK_ICONS, floatWavToPcm16,
 } from '../logic.js';
 
 test('dayKey formats local date', () => {
@@ -104,6 +104,38 @@ test('speakableTexts covers questions, plans and calm steps without duplicates o
   assert.ok(t.includes('Kui suur see vihane tunne oli?'));
   assert.ok(t.includes(planSentence(DEFAULT_SETTINGS.plans[0])));
   assert.equal(new Set(t.map(textHash)).size, t.length);
+});
+
+test('weekView: Mon–Sun of current week, positive statuses, future days blank', () => {
+  const entries = [
+    { type: 'evening', date: '2026-11-16', goalResult: 'yes' },
+    { type: 'evening', date: '2026-11-17', goalResult: 'no' },
+    { type: 'evening', date: '2026-11-18' },
+    { type: 'morning', date: '2026-11-19' },
+    { type: 'evening', date: '2026-11-09', goalResult: 'yes' }, // last week
+  ];
+  const w = weekView(entries, '2026-11-19'); // Thursday
+  assert.deepEqual(w.map((d) => d.date), ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22']);
+  assert.deepEqual(w.map((d) => d.status), ['yes', 'no', 'done', 'empty', 'future', 'future', 'future']);
+  assert.equal(w[3].isToday, true);
+  assert.equal(WEEK_ICONS.no, '🌱');
+});
+
+test('floatWavToPcm16 converts float WAV to 16-bit PCM and passes others through', () => {
+  const n = 3; const buf = new ArrayBuffer(44 + n * 4); const v = new DataView(buf);
+  const str = (p, s) => [...s].forEach((c, i) => v.setUint8(p + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 4, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 3, true); v.setUint16(22, 1, true); v.setUint32(24, 22050, true);
+  v.setUint32(28, 22050 * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 32, true);
+  str(36, 'data'); v.setUint32(40, n * 4, true);
+  [0, 1, -1].forEach((x, i) => v.setFloat32(44 + i * 4, x, true));
+  const out = new DataView(floatWavToPcm16(buf));
+  assert.equal(out.getUint16(20, true), 1);   // PCM
+  assert.equal(out.getUint16(34, true), 16);  // 16-bit
+  assert.equal(out.getUint32(24, true), 22050);
+  assert.deepEqual([0, 1, 2].map((i) => out.getInt16(44 + i * 2, true)), [0, 32767, -32768]);
+  const other = new ArrayBuffer(8);
+  assert.equal(floatWavToPcm16(other), other);
 });
 
 test('escapeHtml', () => {

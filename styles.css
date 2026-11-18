@@ -132,3 +132,10 @@ i.hard { background: #ff8a80; } i.good { background: #7ad3a0; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
 .say { position: fixed; right: max(16px, calc(50% - 264px)); top: max(16px, env(safe-area-inset-top)); width: 52px; height: 52px; border-radius: 50%; border: 0; background: #fff; font-size: 1.6rem; box-shadow: 0 3px 10px rgba(0,0,0,.12); cursor: pointer; z-index: 5; }
 .sound { border: 0; background: none; font-size: 1.6rem; margin-left: auto; margin-right: 8px; cursor: pointer; }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 14px 0 0; }
+.day { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.day span { width: 40px; height: 40px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 1.3rem; box-shadow: 0 2px 0 rgba(0,0,0,.06); }
+.day.future span { background: transparent; border: 2px dashed #d8d6ee; box-shadow: none; }
+.day.yes span { background: #fff3c4; } .day.partly span { background: #e3f0ff; } .day.no span { background: #dff5e7; }
+.day.today small { font-weight: 800; color: var(--primary); }
+.day small { color: var(--muted); font-weight: 600; }
